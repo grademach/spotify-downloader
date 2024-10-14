@@ -1,16 +1,36 @@
-# Spicetify Creator
+Here’s a README for your Spicetify extension project based on the directory structure you've shared:
 
-Spicetify Creator is a tool to compile modern Typescript/Javascript code to Spicetify extensions and custom apps.
+---
 
-## Features
-- Typescript and React syntax
-- Import node packages
-- CSS/SCSS with PostCSS support
-- Extremely fast compile time with esbuild.
-- Plugins
+# Spicetify Song Downloader
 
-## Docs
-Check out [Spicetify's docs](https://spicetify.app/docs/development/spicetify-creator/the-basics)!
+An extension that makes it easy to download songs from Spotify using Spicetify and SpotDL.
 
-## Made with Spicetify Creator
-- https://github.com/spicetify/spicetify-creator
+## Installation
+
+To get started, install spicetify, spotdl, clone the repository and install the dependencies:
+
+```bash
+git clone https://github.com/grademach/spotify-downloader.git
+cd song-downloader
+npm install
+tsc
+```
+
+Copy `app.js` from `dist/app.js` to the spicetify extensions folder
+
+Windows	`%appdata%\spicetify\Extensions\`
+Linux/MacOS	`~/.config/spicetify/Extensions`
+
+After placing the extension file into correct folder, run following command to install it:
+
+spicetify config extensions <file name>
+spicetify apply
+
+## License
+
+[MIT](https://choosealicense.com/licenses/mit/)
+
+---
+
+Feel free to modify any sections to better fit your project's specifics!
