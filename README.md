@@ -1,7 +1,3 @@
-Here’s a README for your Spicetify extension project based on the directory structure you've shared:
-
----
-
 # Spicetify Song Downloader
 
 An extension that makes it easy to download songs from Spotify using Spicetify and SpotDL.
@@ -30,7 +26,3 @@ spicetify apply
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
-
----
-
-Feel free to modify any sections to better fit your project's specifics!
