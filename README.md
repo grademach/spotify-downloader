@@ -21,7 +21,7 @@ Linux/MacOS	`~/.config/spicetify/Extensions`
 After placing the extension file into correct folder, run following command to install it:
 
 ```bash
-spicetify config extensions <file name>
+spicetify config extensions apply
 spicetify apply
 ```
 
