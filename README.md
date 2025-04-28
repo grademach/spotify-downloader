@@ -8,7 +8,7 @@ To get started, install spicetify, spotdl, clone the repository and install the 
 
 ```bash
 git clone https://github.com/grademach/spotify-downloader.git
-cd song-downloader
+cd spotify-downloader
 npm install
 tsc
 ```
@@ -20,8 +20,10 @@ Linux/MacOS	`~/.config/spicetify/Extensions`
 
 After placing the extension file into correct folder, run following command to install it:
 
+```bash
 spicetify config extensions <file name>
 spicetify apply
+```
 
 ## License
 
