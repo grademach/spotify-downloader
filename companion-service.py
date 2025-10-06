@@ -101,10 +101,9 @@ class DownloadHandler(BaseHTTPRequestHandler):
             # Ensure output directory exists
             os.makedirs(output_dir, exist_ok=True)
 
+            cmd = ["spotdl", "download", url, "--output", output_dir]
             if USE_UVX:
-                cmd = ["uvx", "spotdl", "download", url, "--output", output_dir]
-            else:
-                cmd = ["spotdl", "download", url, "--output", output_dir]
+                cmd.insert(0, "uvx")
 
             result = subprocess.run(
                 cmd,
