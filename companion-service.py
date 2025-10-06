@@ -15,6 +15,20 @@ PORT = 8937
 DOWNLOAD_DIR = str(Path.home() / "Music")
 
 
+# Check uvx availability at startup
+def check_uvx_available():
+    try:
+        result = subprocess.run(["uvx", "--version"], capture_output=True)
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+
+
+USE_UVX = check_uvx_available()
+if USE_UVX:
+    print("Found uvx, using it to run spotdl commands.")
+
+
 class DownloadHandler(BaseHTTPRequestHandler):
     """Handle download requests from the Spicetify extension."""
 
@@ -82,13 +96,16 @@ class DownloadHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(response).encode())
 
     def _download_song(self, url, output_dir):
-        """Execute spotdl to download a song."""
+        """Execute spotdl to download a song, using uvx if available."""
         try:
             # Ensure output directory exists
             os.makedirs(output_dir, exist_ok=True)
 
-            # Run spotdl command
-            cmd = ["spotdl", "download", url, "--output", output_dir]
+            if USE_UVX:
+                cmd = ["uvx", "spotdl", "download", url, "--output", output_dir]
+            else:
+                cmd = ["spotdl", "download", url, "--output", output_dir]
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -129,7 +146,7 @@ def main():
     httpd = HTTPServer(server_address, DownloadHandler)
 
     print("╔══════════════════════════════════════════════════╗")
-    print("║  Spotify Downloader Companion Service           ║")
+    print("║  Spotify Downloader Companion Service            ║")
     print("╚══════════════════════════════════════════════════╝")
     print("")
     print(f"🎵 Service running on http://127.0.0.1:{PORT}")
