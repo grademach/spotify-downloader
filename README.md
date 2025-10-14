@@ -4,10 +4,10 @@ An extension that makes it easy to download songs from Spotify using Spicetify a
 
 ## Features
 
-- 🎵 **Right-click to download**: Add "Download song" to the context menu for any track
-- 🚀 **Companion service**: Automatic downloads with a lightweight Python HTTP server (optional)
-- 📋 **Fallback mode**: Falls back to clipboard copy if companion service is not running
-- ✅ **Real-time notifications**: Get instant feedback on download status
+- **Right-click to download**: Add "Download song" to the context menu for any track
+- **Companion service**: Automatic downloads with a lightweight Python HTTP server (optional)
+- **Fallback mode**: Falls back to clipboard copy if companion service is not running
+- **Real-time notifications**: Get instant feedback on download status
 
 ## Installation
 
