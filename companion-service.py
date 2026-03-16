@@ -5,6 +5,7 @@ A lightweight HTTP server that handles download requests from the Spicetify exte
 Uses yt-dlp to download audio and mutagen to embed Spotify metadata.
 """
 
+import argparse
 import json
 import subprocess
 import sys
@@ -16,6 +17,7 @@ from urllib.request import urlopen
 PORT = 8937
 DOWNLOAD_DIR = str(Path.home() / "Music")
 TIMEOUT = 300  # 5 minutes
+PREFER_VIDEO = False  # set via --prefer-video flag
 
 
 def check_dependencies():
@@ -94,11 +96,15 @@ class DownloadHandler(BaseHTTPRequestHandler):
         filename = f"{safe_artist} - {safe_title}" if safe_artist else safe_title
         output_template = os.path.join(output_dir, f"{filename}.%(ext)s")
 
-        # Let yt-dlp search and download in one shot
-        # --default-search ytsearch falls back to YouTube search for non-URL queries
+        # Append search hint based on preference
+        if PREFER_VIDEO:
+            search_query = f"{query} official video"
+        else:
+            search_query = f"{query} audio"
+
         cmd = [
             "yt-dlp",
-            f"ytsearch1:{query}",
+            f"ytsearch1:{search_query}",
             "-x",
             "--audio-format", "mp3",
             "--audio-quality", "0",
@@ -235,6 +241,16 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
 
 def main():
+    global PREFER_VIDEO, DOWNLOAD_DIR
+
+    parser = argparse.ArgumentParser(description="Spotify Downloader Companion Service")
+    parser.add_argument("--prefer-video", action="store_true", help="Prefer official video over audio-only results")
+    parser.add_argument("--output", default=DOWNLOAD_DIR, help=f"Download directory (default: {DOWNLOAD_DIR})")
+    args = parser.parse_args()
+
+    PREFER_VIDEO = args.prefer_video
+    DOWNLOAD_DIR = args.output
+
     missing = check_dependencies()
     if missing:
         print(f"Error: Missing required dependencies: {', '.join(missing)}")
@@ -254,6 +270,7 @@ def main():
     print("")
     print(f"  Service running on http://127.0.0.1:{PORT}")
     print(f"  Download directory: {DOWNLOAD_DIR}")
+    print(f"  Download mode: {'video' if PREFER_VIDEO else 'audio'}")
     print("")
     print("Press Ctrl+C to stop the service")
     print("")

@@ -42,36 +42,22 @@ async function main() {
     }
 
     // For non-playing tracks, use Spicetify's internal GraphQL
-    const hasDefs = !!Spicetify.GraphQL?.Definitions;
-    const hasGetTrackName = !!Spicetify.GraphQL?.Definitions?.getTrackName;
-    const hasQueryTrackArtists = !!Spicetify.GraphQL?.Definitions?.queryTrackArtists;
-
     let nameRes: any, artistsRes: any;
     try {
-      nameRes = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getTrackName, { trackUri: uri, uri });
-    } catch (e) {
-      throw new Error(`getTrackName failed: ${JSON.stringify(e)}`);
-    }
-    try {
-      artistsRes = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryTrackArtists, { trackUri: uri, uri, locale: "", includePrerelease: false });
-    } catch (e) {
-      throw new Error(`queryTrackArtists failed: ${JSON.stringify(e)}`);
+      [nameRes, artistsRes] = await Promise.all([
+        Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getTrackName, { trackUri: uri, uri }),
+        Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryTrackArtists, { trackUri: uri, uri, locale: "", includePrerelease: false }),
+      ]);
+    } catch (e: any) {
+      throw new Error(`Failed to fetch track metadata: ${e?.message ?? JSON.stringify(e)}`);
     }
 
     const title = nameRes?.data?.trackUnion?.name ?? "";
+    if (!title) throw new Error("Could not fetch track title");
 
-    // Extract artist - try multiple known response shapes
     const trackUnion = artistsRes?.data?.trackUnion;
-    let artist = "";
     const firstArtist = trackUnion?.firstArtist?.items ?? trackUnion?.artists?.items ?? [];
-    artist = firstArtist.map((a: any) => a?.profile?.name ?? a?.name ?? "").filter(Boolean).join(", ");
-
-    if (!title) {
-      throw new Error(`Empty title. nameRes=${JSON.stringify(nameRes).slice(0,200)} artistsRes=${JSON.stringify(artistsRes).slice(0,200)}`);
-    }
-    if (!artist) {
-      console.warn("[song-downloader] artistsRes:", JSON.stringify(artistsRes));
-    }
+    const artist = firstArtist.map((a: any) => a?.profile?.name ?? a?.name ?? "").filter(Boolean).join(", ");
 
     return {
       title,
@@ -122,11 +108,8 @@ async function main() {
       if (error instanceof DOMException && error.name === "AbortError") {
         Spicetify.showNotification("Download timed out after 5 minutes.", true, 5000);
       } else {
-        const msg = error instanceof Error
-          ? (error.message || error.stack || error.toString())
-          : JSON.stringify(error);
+        const msg = error instanceof Error ? error.message : "Unknown error";
         Spicetify.showNotification(`Error: ${msg}`, true, 5000);
-        console.error("[song-downloader] Error:", error);
       }
     }
   }

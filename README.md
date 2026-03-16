@@ -1,61 +1,81 @@
 # Spicetify Song Downloader
 
-An extension that makes it easy to download songs from Spotify using Spicetify and SpotDL.
+A Spicetify extension that adds a "Download song" option to the right-click context menu for any track. Uses yt-dlp to download audio and embeds Spotify metadata (title, artist, album art, etc.).
 
 ## Features
 
-- **Right-click to download**: Add "Download song" to the context menu for any track
-- **Companion service**: Automatic downloads with a lightweight Python HTTP server (optional)
-- **Fallback mode**: Falls back to clipboard copy if companion service is not running
-- **Real-time notifications**: Get instant feedback on download status
+- **Right-click to download** — adds "Download song" to the context menu for any track
+- **Spotify metadata** — embeds correct title, artist, album, cover art and more
+- **Companion service** — automatic downloads via a lightweight Python HTTP server
+- **Fallback mode** — copies a yt-dlp command to clipboard if the companion service isn't running
+
+## Requirements
+
+- [Spicetify](https://spicetify.app)
+- [Node.js](https://nodejs.org) (for building the extension)
+- [Python](https://python.org) + [uv](https://github.com/astral-sh/uv) (for the companion service)
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+- [ffmpeg](https://ffmpeg.org)
 
 ## Installation
 
-To get started, install **spicetify** and **spotdl**.<br>
-Then clone the repository and install the dependencies:
+Clone the repository and install Node dependencies:
 
 ```bash
 git clone https://github.com/grademach/spotify-downloader.git
 cd spotify-downloader
 npm install
-npm run build-local
 ```
 
-Copy `song-downloader.js` from `dist/song-downloader.js` to the spicetify extensions folder
-
-Windows `%appdata%\spicetify\Extensions\`<br>
-Linux/MacOS `~/.config/spicetify/Extensions`
-
-After placing the extension file into the correct folder, run the following command to install it:
+Run the install script:
 
 ```bash
-spicetify config extensions <file name>
-spicetify apply
+bash install.sh
 ```
 
-## Using the Companion Service (Recommended)
+This builds the extension, copies it to the Spicetify extensions directory, and applies it.
 
-For automatic downloads without clipboard copying, set up the companion service:
+## Companion Service
 
-1. **Install Python dependencies:**
+The companion service handles the actual downloading. Set up Python dependencies:
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+uv pip install -r requirements.txt
+```
 
-2. **Start the companion service:**
+Start the service:
 
-   ```bash
-   python companion-service.py
-   ```
+```bash
+uv run python companion-service.py
+```
 
-3. **Now downloads will happen automatically!** When you click "Download song", the extension will communicate with the companion service to handle the download.
+Downloads are saved to `~/Music` by default.
 
-**See [COMPANION.md](COMPANION.md) for detailed setup instructions, including how to run the service at startup.**
+### Options
+
+```
+--output <dir>    Set the download directory (default: ~/Music)
+--prefer-video    Search for official videos instead of audio-only results
+```
+
+Example:
+
+```bash
+uv run python companion-service.py --output ~/Downloads/Music --prefer-video
+```
 
 ### Without Companion Service
 
-If you don't want to run the companion service, the extension will automatically fall back to copying the download command to your clipboard. You'll need to paste and run it manually in your terminal.
+If the companion service isn't running, the extension copies a `yt-dlp` command to your clipboard when you click "Download song". Paste and run it in your terminal.
+
+## Updating
+
+After pulling new changes, re-run the install script:
+
+```bash
+git pull
+bash install.sh
+```
 
 ## License
 
