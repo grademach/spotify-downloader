@@ -37,16 +37,22 @@ This builds the extension, copies it to the Spicetify extensions directory, and 
 
 ## Companion Service
 
-The companion service handles the actual downloading. Set up Python dependencies:
+The companion service handles the actual downloading.
+
+**With uv (recommended):**
 
 ```bash
 uv pip install -r requirements.txt
+uv run python companion-service.py
 ```
 
-Start the service:
+**With pip:**
 
 ```bash
-uv run python companion-service.py
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python companion-service.py
 ```
 
 Downloads are saved to `~/Music` by default.
@@ -63,6 +69,8 @@ Example:
 ```bash
 uv run python companion-service.py --output ~/Downloads/Music --prefer-video
 ```
+
+See [COMPANION.md](COMPANION.md) for autostart setup (systemd, launchd, Task Scheduler).
 
 ### Without Companion Service
 
