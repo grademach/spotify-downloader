@@ -1,10 +1,11 @@
 # Spicetify Song Downloader
 
-A Spicetify extension that adds a "Download song" option to the right-click context menu for any track. Uses yt-dlp to download audio and embeds Spotify metadata (title, artist, album art, etc.).
+A Spicetify extension that adds "Download song" and "Download playlist" options to Spotify's right-click context menus. Uses yt-dlp to download audio and embeds Spotify metadata (title, artist, album art, etc.).
 
 ## Features
 
 - **Right-click to download** — adds "Download song" to the context menu for any track
+- **Playlist downloads** — queues playlist tracks through the companion service with progress notifications
 - **Spotify metadata** — embeds correct title, artist, album, cover art and more
 - **Companion service** — automatic downloads via a lightweight Python HTTP server
 - **Fallback mode** — copies a yt-dlp command to clipboard if the companion service isn't running
@@ -62,13 +63,17 @@ Downloads are saved to `~/Music` by default.
 ```
 --output <dir>    Set the download directory (default: ~/Music)
 --prefer-video    Search for official videos instead of audio-only results
+--playlist-delay <seconds>
+                  Wait between playlist tracks to reduce rate-limit pressure (default: 1.0)
 ```
 
 Example:
 
 ```bash
-uv run python companion-service.py --output ~/Downloads/Music --prefer-video
+uv run python companion-service.py --output ~/Downloads/Music --prefer-video --playlist-delay 2
 ```
+
+Playlist downloads are saved in a playlist-specific subfolder under the configured output directory.
 
 See [COMPANION.md](COMPANION.md) for autostart setup (systemd, launchd, Task Scheduler).
 
