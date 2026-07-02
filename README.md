@@ -65,12 +65,14 @@ Downloads are saved to `~/Music` by default.
 --prefer-video    Search for official videos instead of audio-only results
 --playlist-delay <seconds>
                   Wait between playlist tracks to reduce rate-limit pressure (default: 1.0)
+--retries <count>
+                  Retry failed track downloads after the first attempt (default: 2)
 ```
 
 Example:
 
 ```bash
-uv run python companion-service.py --output ~/Downloads/Music --prefer-video --playlist-delay 2
+uv run python companion-service.py --output ~/Downloads/Music --prefer-video --playlist-delay 2 --retries 2
 ```
 
 Playlist downloads are saved in a playlist-specific subfolder under the configured output directory.

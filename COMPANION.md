@@ -29,6 +29,8 @@ The service runs on `http://127.0.0.1:8937`.
 --prefer-video    Search for official videos instead of audio-only results
 --playlist-delay <seconds>
                   Wait between playlist tracks to reduce rate-limit pressure (default: 1.0)
+--retries <count>
+                  Retry failed track downloads after the first attempt (default: 2)
 ```
 
 Playlist downloads run as background jobs and save tracks in a playlist-specific subfolder under the configured output directory.
