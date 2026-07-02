@@ -64,7 +64,7 @@ Downloads are saved to `~/Music` by default.
 --output <dir>    Set the download directory (default: ~/Music)
 --prefer-video    Search for official videos instead of audio-only results
 --playlist-delay <seconds>
-                  Wait between playlist/album track starts to reduce rate-limit pressure (default: 1.0)
+                  Optional wait between playlist/album track starts (default: 0.0)
 --playlist-workers <count>
                   Concurrent workers per playlist/album job (default: 2)
 --retries <count>
@@ -74,10 +74,10 @@ Downloads are saved to `~/Music` by default.
 Example:
 
 ```bash
-uv run python companion-service.py --output ~/Downloads/Music --prefer-video --playlist-delay 2 --playlist-workers 2 --retries 2
+uv run python companion-service.py --output ~/Downloads/Music --prefer-video --playlist-workers 3 --retries 2
 ```
 
-Playlist and album downloads are saved in a collection-specific subfolder under the configured output directory. Use `--playlist-workers 1` for serial collection downloads, or `--playlist-delay 0` for faster testing.
+Playlist and album downloads are saved in a collection-specific subfolder under the configured output directory. Use `--playlist-workers 1` for serial collection downloads, `--playlist-workers 3` for faster collection downloads that seem to work fine in testing, or a positive `--playlist-delay` only if you need extra throttling.
 
 See [COMPANION.md](COMPANION.md) for autostart setup (systemd, launchd, Task Scheduler).
 

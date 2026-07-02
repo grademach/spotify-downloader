@@ -23,7 +23,7 @@ PORT = 8937
 DOWNLOAD_DIR = str(Path.home() / "Music")
 TIMEOUT = 300  # 5 minutes
 PREFER_VIDEO = False  # set via --prefer-video flag
-PLAYLIST_DELAY = 1.0
+PLAYLIST_DELAY = 0.0
 PLAYLIST_WORKERS = 2
 DOWNLOAD_RETRIES = 2
 OUTPUT_LOCKS = {}
@@ -561,7 +561,7 @@ def main():
         "--playlist-delay",
         type=float,
         default=PLAYLIST_DELAY,
-        help=f"Seconds to wait between playlist/album track starts (default: {PLAYLIST_DELAY})",
+        help=f"Optional wait between playlist/album track starts (default: {PLAYLIST_DELAY})",
     )
     parser.add_argument(
         "--playlist-workers",

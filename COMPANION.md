@@ -28,14 +28,14 @@ The service runs on `http://127.0.0.1:8937`.
 --output <dir>    Download directory (default: ~/Music)
 --prefer-video    Search for official videos instead of audio-only results
 --playlist-delay <seconds>
-                  Wait between playlist/album track starts to reduce rate-limit pressure (default: 1.0)
+                  Optional wait between playlist/album track starts (default: 0.0)
 --playlist-workers <count>
                   Concurrent workers per playlist/album job (default: 2)
 --retries <count>
                   Retry failed track downloads after the first attempt (default: 2)
 ```
 
-Playlist and album downloads run as background jobs with 2 workers by default and save tracks in a collection-specific subfolder under the configured output directory. Use `--playlist-workers 1` for serial collection downloads, or `--playlist-delay 0` for faster testing.
+Playlist and album downloads run as background jobs with 2 workers by default and save tracks in a collection-specific subfolder under the configured output directory. Use `--playlist-workers 1` for serial collection downloads, `--playlist-workers 3` for faster collection downloads that seem to work fine in testing, or a positive `--playlist-delay` only if you need extra throttling.
 
 ## Running as a Background Service
 
