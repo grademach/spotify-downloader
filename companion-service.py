@@ -23,6 +23,7 @@ DOWNLOAD_DIR = str(Path.home() / "Music")
 TIMEOUT = 300  # 5 minutes
 PREFER_VIDEO = False  # set via --prefer-video flag
 PLAYLIST_DELAY = 1.0
+DOWNLOAD_RETRIES = 2
 DOWNLOAD_LOCK = threading.Lock()
 JOBS_LOCK = threading.Lock()
 QUEUE_CONDITION = threading.Condition()
@@ -326,46 +327,65 @@ class DownloadHandler(BaseHTTPRequestHandler):
             "--print", "after_move:%(title)s",
         ]
 
-        try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=TIMEOUT
-            )
-        except subprocess.TimeoutExpired:
-            return {"success": False, "message": "Download timed out"}
+        max_attempts = DOWNLOAD_RETRIES + 1
+        last_failure = {"success": False, "message": "Download failed"}
 
-        if result.returncode != 0:
-            return {
-                "success": False,
-                "message": "yt-dlp download failed",
-                "error": result.stderr,
-            }
-
-        matched_title = result.stdout.strip()
-
-        # Find the downloaded file
-        output_file = Path(output_dir) / f"{filename}.mp3"
-        if not output_file.exists():
-            candidates = list(Path(output_dir).glob(f"{filename}.*"))
-            if candidates:
-                output_file = candidates[0]
+        for attempt in range(1, max_attempts + 1):
+            try:
+                result = subprocess.run(
+                    cmd, capture_output=True, text=True, timeout=TIMEOUT
+                )
+            except subprocess.TimeoutExpired:
+                last_failure = {"success": False, "message": "Download timed out"}
             else:
-                return {
-                    "success": False,
-                    "message": "Download completed but output file not found",
-                }
+                if result.returncode != 0:
+                    last_failure = {
+                        "success": False,
+                        "message": "yt-dlp download failed",
+                        "error": result.stderr,
+                    }
+                else:
+                    matched_title = result.stdout.strip()
 
-        # Embed Spotify metadata
-        try:
-            DownloadHandler._embed_metadata(output_file, metadata)
-        except Exception as e:
-            print(f"Warning: Failed to embed metadata: {e}")
+                    # Find the downloaded file
+                    output_file = Path(output_dir) / f"{filename}.mp3"
+                    if not output_file.exists():
+                        candidates = list(Path(output_dir).glob(f"{filename}.*"))
+                        if candidates:
+                            output_file = candidates[0]
+                        else:
+                            last_failure = {
+                                "success": False,
+                                "message": "Download completed but output file not found",
+                            }
+                            if attempt < max_attempts:
+                                time.sleep(min(2 * attempt, 10))
+                            continue
 
-        return {
-            "success": True,
-            "message": "Download completed successfully",
-            "matched": matched_title,
-            "file": str(output_file),
-        }
+                    # Embed Spotify metadata
+                    try:
+                        DownloadHandler._embed_metadata(output_file, metadata)
+                    except Exception as e:
+                        print(f"Warning: Failed to embed metadata: {e}")
+
+                    return {
+                        "success": True,
+                        "message": "Download completed successfully",
+                        "matched": matched_title,
+                        "file": str(output_file),
+                        "attempts": attempt,
+                    }
+
+            if attempt < max_attempts:
+                print(
+                    f"Retrying download for {query} "
+                    f"({attempt}/{max_attempts - 1} retries used): "
+                    f"{last_failure.get('message', 'Download failed')}"
+                )
+                time.sleep(min(2 * attempt, 10))
+
+        last_failure["attempts"] = max_attempts
+        return last_failure
 
     @staticmethod
     def _embed_metadata(file_path, metadata):
@@ -455,7 +475,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    global PREFER_VIDEO, DOWNLOAD_DIR, PLAYLIST_DELAY
+    global PREFER_VIDEO, DOWNLOAD_DIR, PLAYLIST_DELAY, DOWNLOAD_RETRIES
 
     parser = argparse.ArgumentParser(description="Spotify Downloader Companion Service")
     parser.add_argument("--prefer-video", action="store_true", help="Prefer official video over audio-only results")
@@ -466,11 +486,18 @@ def main():
         default=PLAYLIST_DELAY,
         help=f"Seconds to wait between playlist tracks (default: {PLAYLIST_DELAY})",
     )
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=DOWNLOAD_RETRIES,
+        help=f"Retries per track after the first attempt (default: {DOWNLOAD_RETRIES})",
+    )
     args = parser.parse_args()
 
     PREFER_VIDEO = args.prefer_video
     DOWNLOAD_DIR = args.output
     PLAYLIST_DELAY = max(0, args.playlist_delay)
+    DOWNLOAD_RETRIES = max(0, args.retries)
 
     missing = check_dependencies()
     if missing:
@@ -493,6 +520,7 @@ def main():
     print(f"  Download directory: {DOWNLOAD_DIR}")
     print(f"  Download mode: {'video' if PREFER_VIDEO else 'audio'}")
     print(f"  Playlist delay: {PLAYLIST_DELAY}s")
+    print(f"  Retries per track: {DOWNLOAD_RETRIES}")
     print("")
     print("Press Ctrl+C to stop the service")
     print("")
