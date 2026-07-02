@@ -6,6 +6,7 @@ Uses yt-dlp to download audio and mutagen to embed Spotify metadata.
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import subprocess
 import sys
@@ -23,8 +24,13 @@ DOWNLOAD_DIR = str(Path.home() / "Music")
 TIMEOUT = 300  # 5 minutes
 PREFER_VIDEO = False  # set via --prefer-video flag
 PLAYLIST_DELAY = 1.0
+PLAYLIST_WORKERS = 2
 DOWNLOAD_RETRIES = 2
-DOWNLOAD_LOCK = threading.Lock()
+OUTPUT_LOCKS = {}
+OUTPUT_LOCKS_LOCK = threading.Lock()
+ART_CACHE = {}
+ART_CACHE_LOCK = threading.Lock()
+ART_URL_LOCKS = {}
 JOBS_LOCK = threading.Lock()
 QUEUE_CONDITION = threading.Condition()
 PLAYLIST_JOBS = {}
@@ -118,6 +124,51 @@ def append_playlist_failure(job_id, failure):
         job["failed"] += 1
 
 
+def increment_playlist_completed(job_id):
+    with JOBS_LOCK:
+        job = PLAYLIST_JOBS.get(job_id)
+        if job:
+            job["completed"] += 1
+
+
+def get_output_lock(lock_key):
+    with OUTPUT_LOCKS_LOCK:
+        lock = OUTPUT_LOCKS.get(lock_key)
+        if lock is None:
+            lock = threading.Lock()
+            OUTPUT_LOCKS[lock_key] = lock
+        return lock
+
+
+def get_art_url_lock(art_url):
+    with ART_CACHE_LOCK:
+        lock = ART_URL_LOCKS.get(art_url)
+        if lock is None:
+            lock = threading.Lock()
+            ART_URL_LOCKS[art_url] = lock
+        return lock
+
+
+def get_cached_album_art(art_url):
+    with ART_CACHE_LOCK:
+        cover_data = ART_CACHE.get(art_url)
+        if cover_data is not None:
+            return cover_data
+
+    lock = get_art_url_lock(art_url)
+    with lock:
+        with ART_CACHE_LOCK:
+            cover_data = ART_CACHE.get(art_url)
+            if cover_data is not None:
+                return cover_data
+
+        cover_data = urlopen(art_url).read()
+
+        with ART_CACHE_LOCK:
+            ART_CACHE[art_url] = cover_data
+        return cover_data
+
+
 def playlist_worker():
     while True:
         with QUEUE_CONDITION:
@@ -139,37 +190,29 @@ def process_playlist_job(job_id):
         job["status"] = "running"
         job["message"] = f"Downloading {playlist_name}"
 
-    for index, track in enumerate(tracks, start=1):
-        title = track.get("title", "Untitled")
-        artist = track.get("artist", "")
-        update_playlist_job(
-            job_id,
-            current={"index": index, "title": title, "artist": artist},
-            message=f"Downloading {index}/{len(tracks)}",
-        )
+    with ThreadPoolExecutor(max_workers=PLAYLIST_WORKERS) as executor:
+        future_tracks = {}
+        for index, track in enumerate(tracks, start=1):
+            future = executor.submit(process_playlist_track, job_id, track, output_dir, index, len(tracks))
+            future_tracks[future] = (index, track)
+            if index < len(tracks) and PLAYLIST_DELAY > 0:
+                time.sleep(PLAYLIST_DELAY)
 
-        with DOWNLOAD_LOCK:
-            result = DownloadHandler._download_song(track, output_dir)
-
-        if result.get("success"):
-            with JOBS_LOCK:
-                job = PLAYLIST_JOBS.get(job_id)
-                if job:
-                    job["completed"] += 1
-        else:
-            append_playlist_failure(
-                job_id,
-                {
-                    "index": index,
-                    "title": title,
-                    "artist": artist,
-                    "message": result.get("message", "Download failed"),
-                    "error": result.get("error", ""),
-                },
-            )
-
-        if index < len(tracks) and PLAYLIST_DELAY > 0:
-            time.sleep(PLAYLIST_DELAY)
+        for future in as_completed(future_tracks):
+            try:
+                future.result()
+            except Exception as e:
+                index, track = future_tracks[future]
+                append_playlist_failure(
+                    job_id,
+                    {
+                        "index": index,
+                        "title": track.get("title", "Untitled"),
+                        "artist": track.get("artist", ""),
+                        "message": "Download failed",
+                        "error": str(e),
+                    },
+                )
 
     with JOBS_LOCK:
         job = PLAYLIST_JOBS.get(job_id)
@@ -181,6 +224,32 @@ def process_playlist_job(job_id):
             f"Downloaded {job['completed']}/{job['total']} tracks"
             if job["failed"] == 0
             else f"Downloaded {job['completed']}/{job['total']} tracks; {job['failed']} failed"
+        )
+
+
+def process_playlist_track(job_id, track, output_dir, index, total):
+    title = track.get("title", "Untitled")
+    artist = track.get("artist", "")
+    update_playlist_job(
+        job_id,
+        current={"index": index, "title": title, "artist": artist},
+        message=f"Downloading {index}/{total}",
+    )
+
+    result = DownloadHandler._download_song(track, output_dir)
+
+    if result.get("success"):
+        increment_playlist_completed(job_id)
+    else:
+        append_playlist_failure(
+            job_id,
+            {
+                "index": index,
+                "title": title,
+                "artist": artist,
+                "message": result.get("message", "Download failed"),
+                "error": result.get("error", ""),
+            },
         )
 
 
@@ -267,8 +336,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            with DOWNLOAD_LOCK:
-                result = self._download_song(data, DOWNLOAD_DIR)
+            result = self._download_song(data, DOWNLOAD_DIR)
             self._json_response(200 if result["success"] else 500, result)
         except Exception as e:
             self._json_response(500, {"status": "error", "message": str(e)})
@@ -302,12 +370,21 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
         title = metadata["title"]
         artist = metadata.get("artist", "")
-        query = f"{artist} - {title}" if artist else title
 
         # Build output filename
         safe_artist = safe_path_segment(artist, "")
         safe_title = safe_path_segment(title, "Untitled")
         filename = f"{safe_artist} - {safe_title}" if safe_artist else safe_title
+        lock_key = str(Path(output_dir).resolve() / filename)
+
+        with get_output_lock(lock_key):
+            return DownloadHandler._download_song_unlocked(metadata, output_dir, filename)
+
+    @staticmethod
+    def _download_song_unlocked(metadata, output_dir, filename):
+        title = metadata["title"]
+        artist = metadata.get("artist", "")
+        query = f"{artist} - {title}" if artist else title
         output_template = os.path.join(output_dir, f"{filename}.%(ext)s")
 
         # Append search hint based on preference
@@ -439,7 +516,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
             art_url = metadata.get("art_url")
             if art_url:
                 try:
-                    cover_data = urlopen(art_url).read()
+                    cover_data = get_cached_album_art(art_url)
                     if "APIC:Cover" in audio:
                         audio.pop("APIC:Cover")
                     audio["APIC"] = APIC(
@@ -475,7 +552,7 @@ class DownloadHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    global PREFER_VIDEO, DOWNLOAD_DIR, PLAYLIST_DELAY, DOWNLOAD_RETRIES
+    global PREFER_VIDEO, DOWNLOAD_DIR, PLAYLIST_DELAY, PLAYLIST_WORKERS, DOWNLOAD_RETRIES
 
     parser = argparse.ArgumentParser(description="Spotify Downloader Companion Service")
     parser.add_argument("--prefer-video", action="store_true", help="Prefer official video over audio-only results")
@@ -484,7 +561,13 @@ def main():
         "--playlist-delay",
         type=float,
         default=PLAYLIST_DELAY,
-        help=f"Seconds to wait between playlist tracks (default: {PLAYLIST_DELAY})",
+        help=f"Seconds to wait between playlist/album track starts (default: {PLAYLIST_DELAY})",
+    )
+    parser.add_argument(
+        "--playlist-workers",
+        type=int,
+        default=PLAYLIST_WORKERS,
+        help=f"Concurrent workers per playlist/album job (default: {PLAYLIST_WORKERS})",
     )
     parser.add_argument(
         "--retries",
@@ -497,6 +580,7 @@ def main():
     PREFER_VIDEO = args.prefer_video
     DOWNLOAD_DIR = args.output
     PLAYLIST_DELAY = max(0, args.playlist_delay)
+    PLAYLIST_WORKERS = max(1, args.playlist_workers)
     DOWNLOAD_RETRIES = max(0, args.retries)
 
     missing = check_dependencies()
@@ -520,6 +604,7 @@ def main():
     print(f"  Download directory: {DOWNLOAD_DIR}")
     print(f"  Download mode: {'video' if PREFER_VIDEO else 'audio'}")
     print(f"  Playlist delay: {PLAYLIST_DELAY}s")
+    print(f"  Playlist workers: {PLAYLIST_WORKERS}")
     print(f"  Retries per track: {DOWNLOAD_RETRIES}")
     print("")
     print("Press Ctrl+C to stop the service")

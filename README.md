@@ -1,11 +1,11 @@
 # Spicetify Song Downloader
 
-A Spicetify extension that adds "Download song" and "Download playlist" options to Spotify's right-click context menus. Uses yt-dlp to download audio and embeds Spotify metadata (title, artist, album art, etc.).
+A Spicetify extension that adds "Download song", "Download playlist", and "Download album" options to Spotify's right-click context menus. Uses yt-dlp to download audio and embeds Spotify metadata (title, artist, album art, etc.).
 
 ## Features
 
 - **Right-click to download** — adds "Download song" to the context menu for any track
-- **Playlist downloads** — queues playlist tracks through the companion service with progress notifications
+- **Playlist and album downloads** — queues collection tracks through the companion service with progress notifications
 - **Spotify metadata** — embeds correct title, artist, album, cover art and more
 - **Companion service** — automatic downloads via a lightweight Python HTTP server
 - **Fallback mode** — copies a yt-dlp command to clipboard if the companion service isn't running
@@ -64,7 +64,9 @@ Downloads are saved to `~/Music` by default.
 --output <dir>    Set the download directory (default: ~/Music)
 --prefer-video    Search for official videos instead of audio-only results
 --playlist-delay <seconds>
-                  Wait between playlist tracks to reduce rate-limit pressure (default: 1.0)
+                  Wait between playlist/album track starts to reduce rate-limit pressure (default: 1.0)
+--playlist-workers <count>
+                  Concurrent workers per playlist/album job (default: 2)
 --retries <count>
                   Retry failed track downloads after the first attempt (default: 2)
 ```
@@ -72,10 +74,10 @@ Downloads are saved to `~/Music` by default.
 Example:
 
 ```bash
-uv run python companion-service.py --output ~/Downloads/Music --prefer-video --playlist-delay 2 --retries 2
+uv run python companion-service.py --output ~/Downloads/Music --prefer-video --playlist-delay 2 --playlist-workers 2 --retries 2
 ```
 
-Playlist downloads are saved in a playlist-specific subfolder under the configured output directory.
+Playlist and album downloads are saved in a collection-specific subfolder under the configured output directory. Use `--playlist-workers 1` for serial collection downloads, or `--playlist-delay 0` for faster testing.
 
 See [COMPANION.md](COMPANION.md) for autostart setup (systemd, launchd, Task Scheduler).
 

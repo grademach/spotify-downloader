@@ -6,9 +6,9 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-if ! command -v spotdl &> /dev/null; then
-    echo "⚠️  spotdl is not installed."
-    echo "Installing spotdl..."
+if ! command -v yt-dlp &> /dev/null; then
+    echo "yt-dlp is not installed."
+    echo "Installing Python dependencies..."
     pip3 install -r requirements.txt
 fi
 
