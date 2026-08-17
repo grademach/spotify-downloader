@@ -203,10 +203,56 @@ async function main() {
     );
   }
 
+  async function getPlaylistTracksFromPlatform(uri: string): Promise<CollectionDownload> {
+    const playlistApi = Spicetify.Platform?.PlaylistAPI;
+    if (typeof playlistApi?.getPlaylist !== "function") {
+      throw new Error("Playlist APIs are unavailable");
+    }
+
+    const playlist = await playlistApi.getPlaylist(uri);
+    const items = playlist?.contents?.items ?? [];
+    const playlistName = firstNonEmpty(
+      playlist?.name,
+      playlist?.metadata?.name,
+      playlist?.identity?.name,
+      `Playlist ${uri.split(":").pop()}`
+    );
+    const trackUris: string[] = items
+      .map((item: any) => item?.uri ?? item?.item?.uri ?? item?.track?.uri)
+      .filter((itemUri: unknown): itemUri is string =>
+        typeof itemUri === "string" && Spicetify.URI.isTrack(itemUri)
+      );
+
+    const tracks: DownloadMetadata[] = [];
+    let skipped = items.length - trackUris.length;
+    const concurrency = 10;
+
+    for (let start = 0; start < trackUris.length; start += concurrency) {
+      const results = await Promise.all(
+        trackUris.slice(start, start + concurrency).map(async (trackUri) => {
+          try {
+            return await getTrackMetadata(trackUri);
+          } catch {
+            return null;
+          }
+        })
+      );
+      for (const result of results) {
+        if (result) {
+          tracks.push(result);
+        } else {
+          skipped += 1;
+        }
+      }
+    }
+
+    return { kind: "playlist", uri, name: playlistName, tracks, skipped };
+  }
+
   async function getPlaylistTracks(uri: string): Promise<CollectionDownload> {
     const fetchPlaylistContents = Spicetify.GraphQL.Definitions.fetchPlaylistContents;
     if (!fetchPlaylistContents) {
-      throw new Error("Playlist GraphQL definition is unavailable");
+      return getPlaylistTracksFromPlatform(uri);
     }
 
     let offset = 0;
